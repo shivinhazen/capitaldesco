@@ -1,96 +1,239 @@
 export const MESES = [
-  "Janeiro",
-  "Fevereiro",
-  "Março",
-  "Abril",
-  "Maio",
-  "Junho",
-  "Julho",
-  "Agosto",
-  "Setembro",
-  "Outubro",
-  "Novembro",
-  "Dezembro",
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ] as const;
 
-/**
- * CONTROLE DE VAAF MESTRE:
- * Altere aqui para 5962.79 quando for testar projetos de 2026 (Simplício Mendes).
- * Deixe 4710.01 para testar projetos históricos de 2022 (Oeiras).
- */
-export const VAAF_NACIONAL_2026 = 4710.01;
-
-export const VAAT_NACIONAL_2026 = 10194.38;
 export const ANO_REFERENCIA = 2026;
+export const MESES_MAXIMOS_REPASSE = 18;
 
+export type Programa = "turmas" | "estabelecimentos";
 export type Etapa = "Creche" | "Pré-escola";
 export type Turno = "Integral" | "Parcial";
 export type Modalidade = "Regular" | "Educação Especial";
 
-export const FATOR_BASE: Record<Etapa, Record<Turno, number>> = {
-  Creche: { Integral: 1.4, Parcial: 1.2 },
-  "Pré-escola": { Integral: 1.3, Parcial: 1.1 },
-};
-
-export function calcularFator(etapa: Etapa, turno: Turno, modalidade: Modalidade): number {
-  const base = FATOR_BASE[etapa][turno];
-  return modalidade === "Educação Especial" ? Math.max(1.2, base) : base;
+export interface ValoresAlunoAno {
+  crecheIntegral: number;
+  crecheParcial: number;
+  preEscolaIntegral: number;
+  preEscolaParcial: number;
 }
 
-export const MESES_MAXIMOS_REPASSE = 18;
+export interface ParametrosFundeb {
+  anoBase: number;
+  vaafMin: number;
+  fatores: Record<Etapa, Record<Turno, number>>;
+  valoresAlunoAno: ValoresAlunoAno;
+  fonte: string;
+  ato: string;
+}
 
-export function mesesDeFuncionamento(dataInicio: string, dataCadastro: string): number {
-  const inicio = dataInicio.split("-").map(Number);
-  if (inicio.length !== 3 || inicio.some(Number.isNaN)) return 0;
+const FATORES_2024: Record<Etapa, Record<Turno, number>> = {
+  Creche: { Integral: 1.5, Parcial: 1.25 },
+  "Pré-escola": { Integral: 1.4, Parcial: 1.15 },
+};
 
-  const [anoInicio, mesInicio, diaInicio] = inicio;
-  if (!anoInicio || !mesInicio || !diaInicio) return 0;
+const FATORES_2025_2026: Record<Etapa, Record<Turno, number>> = {
+  Creche: { Integral: 1.55, Parcial: 1.25 },
+  "Pré-escola": { Integral: 1.5, Parcial: 1.15 },
+};
 
-  const mesesNoAnoDeInicio = 12 - mesInicio + 1;
-  const mesesAnoSubsequente = 12;
-  const totalMeses = mesesNoAnoDeInicio + mesesAnoSubsequente;
+/**
+ * Valores mínimos nacionais publicados pelo Fundeb, já arredondados por
+ * categoria. O cálculo do programa usa estes valores publicados (e não
+ * VAAF-MIN x fator com precisão infinita), reproduzindo o comportamento do FNDE.
+ */
+export const PARAMETROS_FUNDEB: Readonly<Record<number, ParametrosFundeb>> = {
+  2024: {
+    anoBase: 2024,
+    vaafMin: 5648.91,
+    fatores: FATORES_2024,
+    valoresAlunoAno: {
+      crecheIntegral: 8473.37,
+      crecheParcial: 7061.14,
+      preEscolaIntegral: 7908.50,
+      preEscolaParcial: 6496.25,
+    },
+    fonte: "FNDE — Fundeb 2024",
+    ato: "Portaria Interministerial MEC/MF nº 13, de 23/12/2024",
+  },
+  2025: {
+    anoBase: 2025,
+    vaafMin: 5696.84,
+    fatores: FATORES_2025_2026,
+    valoresAlunoAno: {
+      crecheIntegral: 8830.09,
+      crecheParcial: 7121.04,
+      preEscolaIntegral: 8545.25,
+      preEscolaParcial: 6551.36,
+    },
+    fonte: "FNDE — Fundeb 2025",
+    ato: "Portaria Interministerial MEC/MF nº 11, de 27/11/2025",
+  },
+  2026: {
+    anoBase: 2026,
+    vaafMin: 6030.44,
+    fatores: FATORES_2025_2026,
+    valoresAlunoAno: {
+      crecheIntegral: 9347.19,
+      crecheParcial: 7538.05,
+      preEscolaIntegral: 9045.67,
+      preEscolaParcial: 6935.01,
+    },
+    fonte: "FNDE — Fundeb 2026",
+    ato: "Portaria Interministerial MEC/MF nº 11, de 28/08/2026 (vigente desde 01/09/2026)",
+  },
+} as const;
 
-  return Math.min(MESES_MAXIMOS_REPASSE, totalMeses);
+export const VAAF_NACIONAL_2026 = PARAMETROS_FUNDEB[2026].vaafMin;
+export const VAAT_NACIONAL_2026 = 10192.38;
+
+function parseDataIso(data: string): { ano: number; mes: number; dia: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data);
+  if (!match) return null;
+  const ano = Number(match[1]);
+  const mes = Number(match[2]);
+  const dia = Number(match[3]);
+  const d = new Date(Date.UTC(ano, mes - 1, dia));
+  if (d.getUTCFullYear() !== ano || d.getUTCMonth() !== mes - 1 || d.getUTCDate() !== dia) return null;
+  return { ano, mes, dia };
+}
+
+function compararDatas(a: { ano: number; mes: number; dia: number }, b: { ano: number; mes: number; dia: number }): number {
+  return (a.ano - b.ano) || (a.mes - b.mes) || (a.dia - b.dia);
+}
+
+export function diaNacionalCenso(ano: number): string {
+  const ultimoDia = new Date(Date.UTC(ano, 5, 0));
+  const deslocamento = (ultimoDia.getUTCDay() - 3 + 7) % 7;
+  const dia = ultimoDia.getUTCDate() - deslocamento;
+  return `${ano}-05-${String(dia).padStart(2, "0")}`;
+}
+
+export function anoCensoQueComputaraMatricula(dataInicio: string): number | null {
+  const inicio = parseDataIso(dataInicio);
+  if (!inicio) return null;
+  const censo = parseDataIso(diaNacionalCenso(inicio.ano));
+  if (!censo) return null;
+  return compararDatas(inicio, censo) <= 0 ? inicio.ano : inicio.ano + 1;
+}
+
+/**
+ * Meses elegíveis entre o registro no Simec e o início do recebimento pelo
+ * Fundeb. O mês do registro conta integralmente; o total é limitado a 18.
+ * Turmas/estabelecimentos iniciados em novembro/dezembro só geram apoio no
+ * exercício subsequente, conforme Resoluções CD/FNDE nº 6 e nº 7/2025.
+ */
+export function mesesDeFuncionamento(dataInicio: string, dataRegistroSimec: string): number {
+  const inicio = parseDataIso(dataInicio);
+  const registro = parseDataIso(dataRegistroSimec);
+  if (!inicio || !registro || compararDatas(registro, inicio) < 0) return 0;
+
+  const anoCenso = anoCensoQueComputaraMatricula(dataInicio);
+  if (!anoCenso) return 0;
+
+  const inicioFundeb = { ano: anoCenso + 1, mes: 1, dia: 1 };
+  if (compararDatas(registro, inicioFundeb) >= 0) return 0;
+
+  let anoInicial = registro.ano;
+  let mesInicial = registro.mes;
+  if (inicio.mes >= 11 && registro.ano === inicio.ano) {
+    anoInicial = inicio.ano + 1;
+    mesInicial = 1;
+  }
+
+  const mesesAteFundeb = (anoCenso - anoInicial) * 12 + (12 - mesInicial) + 1;
+  return Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, mesesAteFundeb));
+}
+
+export function anoBaseDoPrograma(programa: Programa, dataInicio: string, dataRegistroSimec: string): number | null {
+  const inicio = parseDataIso(dataInicio);
+  const registro = parseDataIso(dataRegistroSimec);
+  if (!inicio || !registro) return null;
+  return programa === "estabelecimentos" ? inicio.ano - 1 : registro.ano;
+}
+
+export function obterParametrosFundeb(programa: Programa, dataInicio: string, dataRegistroSimec: string): ParametrosFundeb | null {
+  const anoBase = anoBaseDoPrograma(programa, dataInicio, dataRegistroSimec);
+  return anoBase ? PARAMETROS_FUNDEB[anoBase] ?? null : null;
+}
+
+export function calcularFator(
+  etapa: Etapa,
+  turno: Turno,
+  _modalidade: Modalidade = "Regular",
+  anoBase = ANO_REFERENCIA,
+): number {
+  const parametros = PARAMETROS_FUNDEB[anoBase] ?? PARAMETROS_FUNDEB[ANO_REFERENCIA];
+  return parametros.fatores[etapa][turno];
+}
+
+function chaveValor(etapa: Etapa, turno: Turno): keyof ValoresAlunoAno {
+  if (etapa === "Creche") return turno === "Integral" ? "crecheIntegral" : "crecheParcial";
+  return turno === "Integral" ? "preEscolaIntegral" : "preEscolaParcial";
+}
+
+export function arredondarMoeda(valor: number): number {
+  return Math.round((valor + Number.EPSILON) * 100) / 100;
+}
+
+export function valorAlunoAno(
+  parametros: ParametrosFundeb,
+  etapa: Etapa,
+  turno: Turno,
+  vaafInformado = parametros.vaafMin,
+): number {
+  if (!Number.isFinite(vaafInformado) || vaafInformado <= 0) return 0;
+  if (Math.abs(vaafInformado - parametros.vaafMin) < 0.005) {
+    return parametros.valoresAlunoAno[chaveValor(etapa, turno)];
+  }
+  return arredondarMoeda(vaafInformado * parametros.fatores[etapa][turno]);
 }
 
 export function calcularRepasse(
-  vaaf_enviado_pela_tela: number, // Vamos ignorar o que a tela teimosa manda
-  fator: number,
+  valorAnualPorAluno: number,
   alunos: number,
   meses: number,
 ): { valorAnual: number; repasse: number } {
-  let valorUnitario = 0;
-  const f = Number(fator.toFixed(2));
-
-  // Usamos EXCLUSIVAMENTE a constante mestre do topo do arquivo
-  if (Math.abs(VAAF_NACIONAL_2026 - 5962.79) < 0.1) {
-    if (f === 1.4) valorUnitario = 8830.09;
-    else if (f === 1.3) valorUnitario = 8545.25;
-    else if (f === 1.2) valorUnitario = 7121.04;
-    else if (f === 1.1) valorUnitario = 6551.36;
-    else valorUnitario = VAAF_NACIONAL_2026 * fator;
-  } else {
-    // Aplica o cálculo puro de 2022 (VAAF x Fator)
-    valorUnitario = VAAF_NACIONAL_2026 * fator;
-  }
-
-  const valorAnual = valorUnitario * alunos;
-  return { valorAnual, repasse: (valorAnual / 12) * meses };
+  const quantidade = Number.isFinite(alunos) ? Math.max(0, alunos) : 0;
+  const mesesValidos = Number.isFinite(meses) ? Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, meses)) : 0;
+  const unitario = Number.isFinite(valorAnualPorAluno) ? Math.max(0, valorAnualPorAluno) : 0;
+  const valorAnual = arredondarMoeda(unitario * quantidade);
+  const repasse = arredondarMoeda((unitario / 12) * mesesValidos * quantidade);
+  return { valorAnual, repasse };
 }
 
-export const brl = (n: number) =>
-  n.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+export function calcularRepassePrograma(args: {
+  programa: Programa;
+  dataInicio: string;
+  dataRegistroSimec: string;
+  etapa: Etapa;
+  turno: Turno;
+  alunos: number;
+  vaafInformado?: number;
+}): { anoBase: number; fator: number; valorUnitario: number; meses: number; valorAnual: number; repasse: number } | null {
+  const parametros = obterParametrosFundeb(args.programa, args.dataInicio, args.dataRegistroSimec);
+  if (!parametros) return null;
+  const meses = mesesDeFuncionamento(args.dataInicio, args.dataRegistroSimec);
+  const fator = calcularFator(args.etapa, args.turno, "Regular", parametros.anoBase);
+  const valorUnitario = valorAlunoAno(parametros, args.etapa, args.turno, args.vaafInformado ?? parametros.vaafMin);
+  return {
+    anoBase: parametros.anoBase,
+    fator,
+    valorUnitario,
+    meses,
+    ...calcularRepasse(valorUnitario, args.alunos, meses),
+  };
+}
 
-export const fatorFmt = (n: number) =>
-  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export function distribuirMatriculas(totalRegular: number, especiais: number): { regularesSemEspecial: number; especiais: number; total: number } {
+  const total = Number.isFinite(totalRegular) ? Math.max(0, totalRegular) : 0;
+  const especiaisValidos = Number.isFinite(especiais) ? Math.max(0, Math.min(especiais, total)) : 0;
+  return { regularesSemEspecial: total - especiaisValidos, especiais: especiaisValidos, total };
+}
 
-export const numeroFmt = (n: number) =>
-  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const fatorFmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const numeroFmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export interface Combinacao {
   chave: string;
