@@ -1,6 +1,16 @@
 export const MESES = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
 ] as const;
 
 export const ANO_REFERENCIA = 2026;
@@ -50,7 +60,7 @@ export const PARAMETROS_FUNDEB: Readonly<Record<number, ParametrosFundeb>> = {
     valoresAlunoAno: {
       crecheIntegral: 8473.37,
       crecheParcial: 7061.14,
-      preEscolaIntegral: 7908.50,
+      preEscolaIntegral: 7908.5,
       preEscolaParcial: 6496.25,
     },
     fonte: "FNDE — Fundeb 2024",
@@ -94,12 +104,16 @@ function parseDataIso(data: string): { ano: number; mes: number; dia: number } |
   const mes = Number(match[2]);
   const dia = Number(match[3]);
   const d = new Date(Date.UTC(ano, mes - 1, dia));
-  if (d.getUTCFullYear() !== ano || d.getUTCMonth() !== mes - 1 || d.getUTCDate() !== dia) return null;
+  if (d.getUTCFullYear() !== ano || d.getUTCMonth() !== mes - 1 || d.getUTCDate() !== dia)
+    return null;
   return { ano, mes, dia };
 }
 
-function compararDatas(a: { ano: number; mes: number; dia: number }, b: { ano: number; mes: number; dia: number }): number {
-  return (a.ano - b.ano) || (a.mes - b.mes) || (a.dia - b.dia);
+function compararDatas(
+  a: { ano: number; mes: number; dia: number },
+  b: { ano: number; mes: number; dia: number },
+): number {
+  return a.ano - b.ano || a.mes - b.mes || a.dia - b.dia;
 }
 
 export function diaNacionalCenso(ano: number): string {
@@ -145,16 +159,24 @@ export function mesesDeFuncionamento(dataInicio: string, dataRegistroSimec: stri
   return Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, mesesAteFundeb));
 }
 
-export function anoBaseDoPrograma(programa: Programa, dataInicio: string, dataRegistroSimec: string): number | null {
+export function anoBaseDoPrograma(
+  programa: Programa,
+  dataInicio: string,
+  dataRegistroSimec: string,
+): number | null {
   const inicio = parseDataIso(dataInicio);
   const registro = parseDataIso(dataRegistroSimec);
   if (!inicio || !registro) return null;
   return programa === "estabelecimentos" ? inicio.ano - 1 : registro.ano;
 }
 
-export function obterParametrosFundeb(programa: Programa, dataInicio: string, dataRegistroSimec: string): ParametrosFundeb | null {
+export function obterParametrosFundeb(
+  programa: Programa,
+  dataInicio: string,
+  dataRegistroSimec: string,
+): ParametrosFundeb | null {
   const anoBase = anoBaseDoPrograma(programa, dataInicio, dataRegistroSimec);
-  return anoBase ? PARAMETROS_FUNDEB[anoBase] ?? null : null;
+  return anoBase ? (PARAMETROS_FUNDEB[anoBase] ?? null) : null;
 }
 
 export function calcularFator(
@@ -189,8 +211,17 @@ export function valorAlunoAno(
   return arredondarMoeda(vaafInformado * parametros.fatores[etapa][turno]);
 }
 
-export function calcularRepasse(valorAnualPorAluno: number, alunos: number, meses: number): { valorAnual: number; repasse: number };
-export function calcularRepasse(vaaf: number, fator: number, alunos: number, meses: number): { valorAnual: number; repasse: number };
+export function calcularRepasse(
+  valorAnualPorAluno: number,
+  alunos: number,
+  meses: number,
+): { valorAnual: number; repasse: number };
+export function calcularRepasse(
+  vaaf: number,
+  fator: number,
+  alunos: number,
+  meses: number,
+): { valorAnual: number; repasse: number };
 export function calcularRepasse(
   valorOuVaaf: number,
   fatorOuAlunos: number,
@@ -209,18 +240,31 @@ export function calcularRepasse(
     const fator = fatorOuAlunos;
     quantidade = alunosOuMeses;
     meses = mesesOpcional;
-    const parametros = Object.values(PARAMETROS_FUNDEB).find((p) => Math.abs(p.vaafMin - vaaf) < 0.01);
+    const parametros = Object.values(PARAMETROS_FUNDEB).find(
+      (p) => Math.abs(p.vaafMin - vaaf) < 0.01,
+    );
     if (parametros) {
-      const pares: Array<[Etapa, Turno]> = [["Creche", "Integral"], ["Creche", "Parcial"], ["Pré-escola", "Integral"], ["Pré-escola", "Parcial"]];
-      const par = pares.find(([etapa, turno]) => Math.abs(parametros.fatores[etapa][turno] - fator) < 0.001);
-      unitario = par ? valorAlunoAno(parametros, par[0], par[1], vaaf) : arredondarMoeda(vaaf * fator);
+      const pares: Array<[Etapa, Turno]> = [
+        ["Creche", "Integral"],
+        ["Creche", "Parcial"],
+        ["Pré-escola", "Integral"],
+        ["Pré-escola", "Parcial"],
+      ];
+      const par = pares.find(
+        ([etapa, turno]) => Math.abs(parametros.fatores[etapa][turno] - fator) < 0.001,
+      );
+      unitario = par
+        ? valorAlunoAno(parametros, par[0], par[1], vaaf)
+        : arredondarMoeda(vaaf * fator);
     } else {
       unitario = arredondarMoeda(vaaf * fator);
     }
   }
 
   const qtdValida = Number.isFinite(quantidade) ? Math.max(0, quantidade) : 0;
-  const mesesValidos = Number.isFinite(meses) ? Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, meses)) : 0;
+  const mesesValidos = Number.isFinite(meses)
+    ? Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, meses))
+    : 0;
   const unitarioValido = Number.isFinite(unitario) ? Math.max(0, unitario) : 0;
   const valorAnual = arredondarMoeda(unitarioValido * qtdValida);
   const repasse = arredondarMoeda((unitarioValido / 12) * mesesValidos * qtdValida);
@@ -235,12 +279,24 @@ export function calcularRepassePrograma(args: {
   turno: Turno;
   alunos: number;
   vaafInformado?: number;
-}): { anoBase: number; fator: number; valorUnitario: number; meses: number; valorAnual: number; repasse: number } | null {
+}): {
+  anoBase: number;
+  fator: number;
+  valorUnitario: number;
+  meses: number;
+  valorAnual: number;
+  repasse: number;
+} | null {
   const parametros = obterParametrosFundeb(args.programa, args.dataInicio, args.dataRegistroSimec);
   if (!parametros) return null;
   const meses = mesesDeFuncionamento(args.dataInicio, args.dataRegistroSimec);
   const fator = calcularFator(args.etapa, args.turno, "Regular", parametros.anoBase);
-  const valorUnitario = valorAlunoAno(parametros, args.etapa, args.turno, args.vaafInformado ?? parametros.vaafMin);
+  const valorUnitario = valorAlunoAno(
+    parametros,
+    args.etapa,
+    args.turno,
+    args.vaafInformado ?? parametros.vaafMin,
+  );
   return {
     anoBase: parametros.anoBase,
     fator,
@@ -250,15 +306,26 @@ export function calcularRepassePrograma(args: {
   };
 }
 
-export function distribuirMatriculas(totalRegular: number, especiais: number): { regularesSemEspecial: number; especiais: number; total: number } {
+export function distribuirMatriculas(
+  totalRegular: number,
+  especiais: number,
+): { regularesSemEspecial: number; especiais: number; total: number } {
   const total = Number.isFinite(totalRegular) ? Math.max(0, totalRegular) : 0;
   const especiaisValidos = Number.isFinite(especiais) ? Math.max(0, Math.min(especiais, total)) : 0;
   return { regularesSemEspecial: total - especiaisValidos, especiais: especiaisValidos, total };
 }
 
-export const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export const fatorFmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export const numeroFmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const brl = (n: number) =>
+  n.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+export const fatorFmt = (n: number) =>
+  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const numeroFmt = (n: number) =>
+  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export interface Combinacao {
   chave: string;
