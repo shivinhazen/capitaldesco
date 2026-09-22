@@ -94,7 +94,7 @@ export const PARAMETROS_FUNDEB: Readonly<Record<number, ParametrosFundeb>> = {
   },
 } as const;
 
-export const VAAF_NACIONAL_2026 = PARAMETROS_FUNDEB[2026].vaafMin;
+export const VAAF_NACIONAL_2026 = PARAMETROS_FUNDEB[2026]!.vaafMin;
 export const VAAT_NACIONAL_2026 = 10192.38;
 
 function parseDataIso(data: string): { ano: number; mes: number; dia: number } | null {
