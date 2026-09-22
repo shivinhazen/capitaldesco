@@ -1,23 +1,19 @@
 # CapitalDesco — Calculadora de Repasse FNDE
 
-Aplicação web para simular repasses do FNDE em **Novas Turmas** e **Novos Estabelecimentos**, com cálculo por categoria de educação infantil, período elegível, parâmetros Fundeb versionados e exportação em PDF.
+Aplicação web para simular repasses do FNDE em **Novas Turmas** e **Novos Estabelecimentos**, com parâmetros Fundeb versionados, período elegível, validações e exportação em PDF.
 
 **Aplicação publicada:** https://capitaldesco.lovable.app
 
-> O README antigo reproduzia o prompt inicial usado para gerar o projeto no Lovable. Ele foi substituído porque aquele texto continha regras provisórias e valores que não devem ser usados como fonte de verdade para o cálculo.
+> O README original reproduzia o prompt usado para gerar a primeira versão no Lovable. Esse prompt é histórico, não uma especificação normativa. Para cálculo, a fonte de verdade é a documentação oficial do FNDE/Fundeb, complementada por casos reais e testes automatizados.
 
-## Estado do projeto
+## Princípios do projeto
 
-O projeto continua visualmente baseado na versão criada no Lovable. A prioridade atual é manter a experiência existente e melhorar o que fica por baixo dela:
-
-- cálculo reproduzível e fundamentado em regras públicas do FNDE;
-- parâmetros Fundeb separados por exercício;
-- casos reais de regressão;
-- validação automática antes de integrar mudanças;
-- menor dependência de consultas externas em tempo de uso;
-- manutenção simples para exercícios futuros.
-
-Não há objetivo de redesenhar a interface. Mudanças visuais devem ser feitas apenas quando algo estiver quebrado, confuso ou prejudicar o uso.
+- **Correção antes de conveniência:** números do FNDE não são inferidos da interface nem de prompts antigos.
+- **Frontend preservado por padrão:** não há objetivo de redesenhar o produto.
+- **Determinismo:** parâmetros nacionais usados no cálculo ficam versionados no repositório.
+- **Fail closed:** exercício sem parâmetro cadastrado bloqueia o cálculo em vez de usar um número silenciosamente incorreto.
+- **Regressão real:** exemplos já calculados pelo FNDE são protegidos por testes centavo a centavo.
+- **Performance útil:** chamadas externas desnecessárias são eliminadas e dados estáveis são reutilizados em cache.
 
 ## Stack
 
@@ -27,44 +23,40 @@ Não há objetivo de redesenhar a interface. Mudanças visuais devem ser feitas 
 - Vite
 - Tailwind CSS
 - shadcn/ui / Radix UI
-- Bun como gerenciador/runtime preferencial
-- jsPDF para relatórios
+- Bun
+- jsPDF / jsPDF-AutoTable
 
 ## Estrutura relevante
 
 ~~~text
 src/
   lib/
-    fnde.ts              # motor de cálculo e parâmetros anuais
-    vaaf.functions.ts    # acesso aos parâmetros oficiais versionados
-    ibge.ts              # estados e municípios, com cache em sessão
+    fnde.ts              # motor de domínio e snapshots Fundeb suportados
+    ibge.ts              # estados/municípios, com cache em memória
     escola.functions.ts  # consulta local da base INEP
   routes/
-    index.tsx             # interface principal
+    index.tsx             # interface e orquestração
 
 tests/
-  fnde.test.ts            # suíte de regressão do cálculo
+  fnde.test.ts            # regras, limites e golden cases do FNDE
+  ibge.test.ts            # cache e falhas da integração de localidades
 
 docs/
-  fnde-calculation.md     # regra de negócio e casos-ouro
-  ai-development.md       # protocolo AI-first para desenvolvimento
+  fnde-calculation.md     # especificação de cálculo, fontes e limitações
+  ai-development.md       # guia AI-first de desenvolvimento
 
 .github/workflows/
-  quality.yml             # testes + lint + build
+  quality.yml             # tests + typecheck + lint + build
 ~~~
 
 ## Desenvolvimento
 
-### Pré-requisitos
-
-Bun é o caminho preferencial:
+Bun é o runtime/gerenciador preferencial:
 
 ~~~bash
 bun install
 bun run dev
 ~~~
-
-Também é possível usar npm quando necessário.
 
 ### Quality gate
 
@@ -72,58 +64,59 @@ Antes de considerar uma alteração pronta:
 
 ~~~bash
 bun run test
+bun run typecheck
 bun run lint
 bun run build
 ~~~
 
-O GitHub Actions executa os mesmos gates automaticamente.
+O mesmo gate roda no GitHub Actions.
 
-## Regras de negócio
+## Fonte de verdade do cálculo
 
-A fonte de verdade da implementação é:
+A ordem de autoridade é:
 
-1. legislação e atos oficiais do FNDE/Fundeb;
-2. casos reais já calculados pelo FNDE;
-3. testes automatizados que registram esses comportamentos.
+1. atos e publicações oficiais do FNDE/Fundeb;
+2. exemplos reais já calculados pelo FNDE;
+3. testes automatizados;
+4. implementação.
 
-A interface, prompts antigos do Lovable e comentários históricos **não são fonte de verdade** para o cálculo.
+A interface e o histórico do Lovable não substituem os itens acima.
 
-A documentação completa está em [docs/fnde-calculation.md](docs/fnde-calculation.md).
+Leia [docs/fnde-calculation.md](docs/fnde-calculation.md) antes de alterar datas, períodos, VAAF, valores aluno/ano, fatores ou matrículas.
 
-## Casos de regressão
+## Casos de regressão já protegidos
 
-A suíte contém casos normativos, limites e exemplos reais. Entre eles:
+Entre os casos reais:
 
-- **Simplício Mendes/PI:** total esperado de R$ 722.928,00;
-- **Vicentinópolis/GO:** total esperado de R$ 147.248,33.
+- **Simplício Mendes/PI:** R$ 722.928,00;
+- **Vicentinópolis/GO:** R$ 147.248,33.
 
-Esses valores precisam continuar sendo reproduzidos centavo por centavo.
+Os resultados devem continuar reproduzíveis centavo a centavo.
 
 ## Desenvolvimento com IA
 
-Este repositório foi preparado para trabalho AI-first.
+O repositório foi preparado para trabalho AI-first. Um agente novo deve começar por:
 
-Qualquer agente deve começar por:
+1. [AGENTS.md](AGENTS.md);
+2. [docs/ai-development.md](docs/ai-development.md);
+3. [docs/fnde-calculation.md](docs/fnde-calculation.md), quando tocar domínio FNDE;
+4. testes existentes da área alterada.
 
-1. ler [AGENTS.md](AGENTS.md);
-2. ler [docs/ai-development.md](docs/ai-development.md);
-3. ler [docs/fnde-calculation.md](docs/fnde-calculation.md) antes de alterar cálculo;
-4. executar os testes antes e depois da mudança;
-5. preservar o frontend por padrão;
-6. nunca inventar regra ou valor de FNDE para “fazer o teste passar”.
+A regra é simples: **não inventar regra de negócio para fazer código ou teste passar**.
 
 ## Git, Lovable e deploy
 
-O repositório original desconet/capitaldesco está conectado ao Lovable.
+O upstream `desconet/capitaldesco` é o repositório conectado ao Lovable.
 
-- O fork shivinhazen/capitaldesco é usado para desenvolvimento e revisão.
-- Alterações no fork **não** devem ser tratadas como publicadas.
-- A sincronização com o Lovable ocorre quando mudanças aprovadas chegam ao branch conectado do repositório original.
-- Não reescreva histórico já publicado no repositório conectado ao Lovable.
-- Prefira branch → testes → Pull Request → revisão → merge.
+- desenvolvimento/revisão pode acontecer em fork e feature branch;
+- o fork não é produção;
+- mudanças aprovadas chegam ao upstream por Pull Request;
+- não faça force-push nem reescreva histórico já sincronizado com o Lovable;
+- antes de abrir/atualizar PR, confirme que o branch está baseado no `main` atual do upstream;
+- merge só depois de todos os gates verdes e revisão do diff.
 
-## Atualização anual
+## Atualização de parâmetros
 
-Quando entrar um novo exercício do Fundeb, não substitua parâmetros históricos.
+Não substitua parâmetros históricos por valores de outro exercício.
 
-Adicione uma nova entrada versionada, registre a fonte normativa e crie testes correspondentes. O procedimento está detalhado em [docs/fnde-calculation.md](docs/fnde-calculation.md).
+Para atualizar o Fundeb, adicione/ajuste o snapshot explicitamente, registre a publicação oficial correspondente e acrescente testes. O procedimento e a política de snapshots estão em [docs/fnde-calculation.md](docs/fnde-calculation.md).
