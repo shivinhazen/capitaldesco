@@ -231,7 +231,7 @@ test("subconjunto Especial não altera a quantidade financeira da categoria", ()
   assert.ok(linha);
   assert.equal(matriculas.total, 20);
   assert.equal(matriculas.regularesSemEspecial + matriculas.especiais, 20);
-  assert.equal(linha.alunos ?? matriculas.total, 20);
+  assert.equal(linha.repasse, 226141.5);
 });
 
 test("NaN e infinito não contaminam o total financeiro", () => {
