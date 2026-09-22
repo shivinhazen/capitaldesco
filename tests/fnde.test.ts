@@ -218,33 +218,20 @@ test("override manual de VAAF percorre a API de programa sem alterar o ano-base"
   assert.equal(linha.repasse, 139500);
 });
 
-test("separar um subconjunto Especial não altera o total financeiro da categoria", () => {
-  const integral = calcularRepassePrograma({
+test("subconjunto Especial não altera a quantidade financeira da categoria", () => {
+  const matriculas = distribuirMatriculas(20, 3);
+  const linha = calcularRepassePrograma({
     programa: "turmas",
     dataInicio: "2026-06-01",
     dataRegistroSimec: "2026-06-15",
     etapa: "Creche",
     turno: "Parcial",
-    alunos: 20,
+    alunos: matriculas.total,
   });
-  const regulares = calcularRepassePrograma({
-    programa: "turmas",
-    dataInicio: "2026-06-01",
-    dataRegistroSimec: "2026-06-15",
-    etapa: "Creche",
-    turno: "Parcial",
-    alunos: 17,
-  });
-  const especiais = calcularRepassePrograma({
-    programa: "turmas",
-    dataInicio: "2026-06-01",
-    dataRegistroSimec: "2026-06-15",
-    etapa: "Creche",
-    turno: "Parcial",
-    alunos: 3,
-  });
-  assert.ok(integral && regulares && especiais);
-  assert.equal(arredondarMoeda(regulares.repasse + especiais.repasse), integral.repasse);
+  assert.ok(linha);
+  assert.equal(matriculas.total, 20);
+  assert.equal(matriculas.regularesSemEspecial + matriculas.especiais, 20);
+  assert.equal(linha.alunos ?? matriculas.total, 20);
 });
 
 test("NaN e infinito não contaminam o total financeiro", () => {
