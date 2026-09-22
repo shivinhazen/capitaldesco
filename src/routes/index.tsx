@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier -- preserve Lovable-generated route formatting; avoid a whole-file cosmetic diff */
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
