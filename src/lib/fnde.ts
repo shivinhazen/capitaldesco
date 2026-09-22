@@ -1,18 +1,3 @@
-export const MESES = [
-  "Janeiro",
-  "Fevereiro",
-  "Março",
-  "Abril",
-  "Maio",
-  "Junho",
-  "Julho",
-  "Agosto",
-  "Setembro",
-  "Outubro",
-  "Novembro",
-  "Dezembro",
-] as const;
-
 export const ANO_REFERENCIA = 2026;
 export const MESES_MAXIMOS_REPASSE = 18;
 
@@ -95,8 +80,6 @@ export const PARAMETROS_FUNDEB: Readonly<Record<number, ParametrosFundeb>> = {
 } as const;
 
 export const VAAF_NACIONAL_2026 = PARAMETROS_FUNDEB[2026]!.vaafMin;
-export const VAAT_NACIONAL_2026 = 10192.38;
-
 function parseDataIso(data: string): { ano: number; mes: number; dia: number } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data);
   if (!match) return null;
@@ -228,9 +211,17 @@ export function calcularRepasse(
     ? Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, meses))
     : 0;
   const unitario = Number.isFinite(valorAnualPorAluno) ? Math.max(0, valorAnualPorAluno) : 0;
-  const valorAnual = arredondarMoeda(unitario * quantidade);
-  const repasse = arredondarMoeda((unitario / 12) * mesesValidos * quantidade);
-  return { valorAnual, repasse };
+
+  // Os valores aluno/ano oficiais já são publicados em centavos. Fazer a parte
+  // financeira em centavos evita deriva binária de ponto flutuante nos totais.
+  const unitarioCentavos = Math.round(unitario * 100);
+  const valorAnualCentavos = Math.round(unitarioCentavos * quantidade);
+  const repasseCentavos = Math.round((unitarioCentavos * quantidade * mesesValidos) / 12);
+
+  return {
+    valorAnual: valorAnualCentavos / 100,
+    repasse: repasseCentavos / 100,
+  };
 }
 
 export function calcularRepassePrograma(args: {
