@@ -189,16 +189,41 @@ export function valorAlunoAno(
   return arredondarMoeda(vaafInformado * parametros.fatores[etapa][turno]);
 }
 
+export function calcularRepasse(valorAnualPorAluno: number, alunos: number, meses: number): { valorAnual: number; repasse: number };
+export function calcularRepasse(vaaf: number, fator: number, alunos: number, meses: number): { valorAnual: number; repasse: number };
 export function calcularRepasse(
-  valorAnualPorAluno: number,
-  alunos: number,
-  meses: number,
+  valorOuVaaf: number,
+  fatorOuAlunos: number,
+  alunosOuMeses: number,
+  mesesOpcional?: number,
 ): { valorAnual: number; repasse: number } {
-  const quantidade = Number.isFinite(alunos) ? Math.max(0, alunos) : 0;
+  let unitario = valorOuVaaf;
+  let quantidade = fatorOuAlunos;
+  let meses = alunosOuMeses;
+
+  // Compatibilidade temporária com a tela existente. Quando o VAAF corresponde
+  // a um ano conhecido, usa o valor aluno/ano publicado pelo FNDE para evitar
+  // divergências de centavos por arredondamento.
+  if (mesesOpcional !== undefined) {
+    const vaaf = valorOuVaaf;
+    const fator = fatorOuAlunos;
+    quantidade = alunosOuMeses;
+    meses = mesesOpcional;
+    const parametros = Object.values(PARAMETROS_FUNDEB).find((p) => Math.abs(p.vaafMin - vaaf) < 0.01);
+    if (parametros) {
+      const pares: Array<[Etapa, Turno]> = [["Creche", "Integral"], ["Creche", "Parcial"], ["Pré-escola", "Integral"], ["Pré-escola", "Parcial"]];
+      const par = pares.find(([etapa, turno]) => Math.abs(parametros.fatores[etapa][turno] - fator) < 0.001);
+      unitario = par ? valorAlunoAno(parametros, par[0], par[1], vaaf) : arredondarMoeda(vaaf * fator);
+    } else {
+      unitario = arredondarMoeda(vaaf * fator);
+    }
+  }
+
+  const qtdValida = Number.isFinite(quantidade) ? Math.max(0, quantidade) : 0;
   const mesesValidos = Number.isFinite(meses) ? Math.max(0, Math.min(MESES_MAXIMOS_REPASSE, meses)) : 0;
-  const unitario = Number.isFinite(valorAnualPorAluno) ? Math.max(0, valorAnualPorAluno) : 0;
-  const valorAnual = arredondarMoeda(unitario * quantidade);
-  const repasse = arredondarMoeda((unitario / 12) * mesesValidos * quantidade);
+  const unitarioValido = Number.isFinite(unitario) ? Math.max(0, unitario) : 0;
+  const valorAnual = arredondarMoeda(unitarioValido * qtdValida);
+  const repasse = arredondarMoeda((unitarioValido / 12) * mesesValidos * qtdValida);
   return { valorAnual, repasse };
 }
 
