@@ -1,155 +1,157 @@
 <!-- LOVABLE:BEGIN -->
 > [!IMPORTANT]
-> The upstream project desconet/capitaldesco is connected to Lovable.
-> Do not rewrite published upstream history: no force push, no rebase/amend/squash
-> of commits that are already published there.
+> The upstream project `desconet/capitaldesco` is connected to Lovable.
+> Never rewrite published upstream history: no force-push and no rebase/amend/squash
+> of commits already synchronized there.
 >
 > Work should normally happen in a feature branch or fork, pass all quality gates,
-> and reach upstream through a reviewed pull request. The fork itself is not the
-> production/Lovable source of truth.
+> and reach upstream through a reviewed pull request. A fork is not production.
 <!-- LOVABLE:END -->
 
 # AGENTS.md
 
-This repository is designed for AI-assisted development. Treat this file as the operational contract for coding agents.
+Operational contract for humans and coding agents working on CapitalDesco.
 
-## 1. Read order before changing code
+## 1. Mandatory read order
 
-Read, in this order:
+Before changing code:
 
-1. README.md
-2. docs/ai-development.md
-3. docs/fnde-calculation.md for any calculation, date, Fundeb or enrollment change
-4. the relevant implementation files
-5. existing tests covering the area
+1. `README.md`;
+2. `docs/ai-development.md`;
+3. `docs/fnde-calculation.md` for any FNDE/Fundeb/date/enrollment change;
+4. relevant implementation files;
+5. existing tests for that area.
 
-Do not start by editing code from a prompt-only understanding.
+Do not edit from prompt-only context.
 
 ## 2. Product invariants
 
-- Preserve the current frontend and visual identity by default.
-- Do not redesign, reorganize screens or replace the stack unless explicitly requested.
-- UI changes are allowed only to fix something broken, misleading, inaccessible or measurably inefficient.
-- Correctness, reliability, performance and maintainability have priority over cosmetic refactors.
-- The app is an estimator/support tool; do not silently present guessed values as official.
+- Preserve the existing frontend and visual identity by default.
+- Do not redesign, reorganize flows or replace the stack unless explicitly requested.
+- UI changes are acceptable only to fix something broken, misleading, inaccessible or measurably inefficient.
+- Correctness, reliability, performance and maintainability take priority over cosmetic refactors.
+- Never present guessed parameters as official.
+- Keep user-visible terminology aligned with the rule being implemented.
 
-## 3. FNDE calculation invariants
+## 3. FNDE source-of-truth order
 
-For calculation logic, the source-of-truth order is:
+For calculation behavior:
 
-1. official FNDE/Fundeb legislation and published parameters;
-2. real FNDE-calculated examples;
+1. official FNDE/Fundeb legislation and publications;
+2. real FNDE-calculated evidence;
 3. regression tests;
 4. implementation.
 
-Never reverse that order.
+Never reverse this order.
 
 Specifically:
 
-- do not infer business rules from the current UI;
-- do not copy values from old Lovable prompts;
-- do not replace historical parameters with the latest year;
-- do not make a failing golden test pass by changing the expected value unless the official reference itself was proven wrong;
-- do not introduce fallback numbers for an unsupported year;
-- preserve cent-level reproducibility for known FNDE examples.
+- do not infer a rule from the current UI;
+- do not reuse numbers from old Lovable prompts as normative data;
+- do not silently replace historical snapshots with a newer exercise;
+- do not change a golden expected value just to make a test pass;
+- do not fall back to another year when the requested year is unsupported;
+- preserve cent-level reproducibility of verified cases;
+- if official sources conflict or leave a material ambiguity, stop and document it.
 
-Core calculation code belongs in src/lib/fnde.ts, not inside React rendering code.
+The domain layer belongs in `src/lib/fnde.ts`; React should orchestrate and display it, not redefine it.
 
 ## 4. Change protocol
 
 Before editing:
 
-- identify the user-visible problem;
-- identify the authoritative rule/data source;
-- find or add a test that reproduces the issue;
-- make the smallest coherent implementation change.
+- define the user-visible problem;
+- identify the authoritative source or verified evidence;
+- reproduce the defect with a test when deterministic;
+- choose the smallest coherent change.
 
-After editing, run:
+Before declaring ready:
 
 ~~~bash
 bun run test
+bun run typecheck
 bun run lint
 bun run build
 ~~~
 
-A change is not ready while any of these fail.
+All four must pass.
 
-When a bug is fixed, add a regression test whenever the behavior can be expressed deterministically.
+## 5. Testing expectations
 
-## 5. Test expectations
+Add coverage where relevant for:
 
-The suite should cover, when relevant:
-
-- official annual parameters;
+- annual Fundeb snapshots;
 - factors and published student-year values;
-- date boundaries;
-- Censo Escolar boundaries;
-- the 18-month cap;
+- Censo Escolar boundary dates;
+- month counting and 18-month cap;
 - November/December behavior;
-- invalid dates and invalid quantities;
+- invalid chronology and malformed dates;
 - monetary rounding;
-- historical-year preservation;
-- Regular/Special enrollment non-duplication;
+- unsupported years;
+- manual VAAF override behavior;
+- Regular/Special non-duplication;
 - real FNDE golden cases;
-- unsupported-year behavior.
+- cache/failure behavior of external lookups.
 
-Prefer deterministic tests. Do not make core correctness depend on live external services.
+Core correctness tests must not depend on live external services.
 
 ## 6. Performance rules
 
-Prefer eliminating work over hiding it behind loading states.
+Prefer removing work to hiding it behind a spinner.
 
-- Avoid network calls for static/national parameters that can be versioned safely.
-- Cache stable lookup data when appropriate.
-- Avoid duplicate fetches and duplicate calculations.
-- Keep heavy work out of render paths.
-- Do not add a dependency when a small existing utility is sufficient.
-- Preserve graceful behavior when IBGE/INEP or another external service is unavailable.
+- Static/national calculation parameters should not require a live network request.
+- Cache stable lookup data where safe.
+- Avoid duplicate fetches and stale async responses.
+- Keep business math out of render-time ad hoc code.
+- Do not add dependencies without a concrete benefit.
+- External IBGE/INEP failures must not silently alter repasse math.
 
-Performance work must not weaken correctness.
+Performance improvements must preserve numerical correctness.
 
 ## 7. Architecture boundaries
 
-- src/lib/fnde.ts: pure FNDE domain logic and annual parameters.
-- src/lib/vaaf.functions.ts: server access to versioned Fundeb parameters.
-- src/lib/ibge.ts: locality lookup.
-- src/lib/escola.functions.ts: INEP school lookup.
-- src/routes/index.tsx: presentation/orchestration; avoid moving business rules here.
-- tests/fnde.test.ts: deterministic domain regression suite.
-- docs/fnde-calculation.md: human-readable business-rule specification.
+- `src/lib/fnde.ts`: deterministic FNDE domain logic + supported Fundeb snapshots.
+- `src/lib/ibge.ts`: locality lookup and cache.
+- `src/lib/escola.functions.ts`: INEP school lookup.
+- `src/routes/index.tsx`: form state, orchestration, rendering and PDF.
+- `tests/fnde.test.ts`: domain regression/golden suite.
+- `tests/ibge.test.ts`: locality integration behavior with mocked network.
+- `docs/fnde-calculation.md`: human-readable calculation specification.
+- `docs/ai-development.md`: development/handoff protocol.
 
-If a new feature crosses these boundaries, keep the domain rule testable without rendering React.
+If a new rule can be tested without React, keep it out of the route component.
 
 ## 8. Git and Lovable safety
 
-- Never push experimental work directly to upstream main.
-- Never force push the Lovable-connected upstream history.
-- Prefer a fork/feature branch and a PR.
-- Keep each branch in a buildable state where practical.
-- Do not merge while required checks are failing.
-- Before opening a PR, compare against the current upstream main to detect Lovable/user changes made in parallel.
+- Never push experimental changes to upstream `main`.
+- Never force-push Lovable-connected published history.
+- Prefer fork/feature branch → quality gates → PR → review → merge.
+- Before PR/merge, compare against current upstream `main`.
+- If upstream changed concurrently, reconcile first; do not overwrite it.
+- Do not merge while a required check is red.
 
 ## 9. Documentation maintenance
 
-Update documentation in the same change when:
+Update docs in the same change when:
 
-- a business rule changes;
-- an annual parameter is added;
-- a new external dependency is introduced;
-- the development workflow changes;
-- a new invariant would prevent future AI mistakes.
+- a calculation rule or assumption changes;
+- a Fundeb snapshot changes;
+- an integration/dependency changes;
+- the quality workflow changes;
+- a newly discovered invariant would prevent future mistakes.
 
-If code and docs disagree, stop and resolve the disagreement instead of guessing.
+If code, tests and docs disagree, stop and resolve the disagreement rather than choosing one silently.
 
 ## 10. Stop conditions
 
-Stop and ask for human input when:
+Ask for human/product input when:
 
-- two authoritative sources conflict;
-- a requested behavior is a product choice rather than an FNDE rule;
+- two authoritative sources materially conflict;
+- behavior is a product choice rather than an FNDE rule;
 - a change would materially redesign the interface;
-- a change would delete or reinterpret historical calculation data;
-- production/Lovable behavior cannot be verified safely;
-- an upstream change creates a merge conflict in calculation code.
+- historical data would need reinterpretation/deletion;
+- a known regulatory exception needs input the UI does not collect;
+- production/Lovable behavior cannot be safely verified;
+- upstream changes conflict with calculation code.
 
-Do not use human uncertainty as permission to invent a rule.
+Do not use uncertainty as permission to invent a rule.
