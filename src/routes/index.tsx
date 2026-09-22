@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { consultarEscolaPorInep, type EscolaInep } from "@/lib/escola.functions";
 import {
-  ANO_REFERENCIA, anoBaseDoPrograma, brl, calcularFator, calcularRepassePrograma, COMBINACOES, distribuirMatriculas, type Etapa,
+  ANO_REFERENCIA, anoBaseDoPrograma, brl, calcularFator, calcularRepassePrograma, COMBINACOES, type Etapa,
   fatorFmt, mesesDeFuncionamento, type Modalidade, numeroFmt, parametrosFundebPorAno, type Turno, VAAF_NACIONAL_2026,
 } from "@/lib/fnde";
 import { buscarMunicipios, buscarUfs, type Municipio, type Uf } from "@/lib/ibge";
@@ -133,35 +133,20 @@ function Index() {
 
   const resultadosTurmas = useMemo<Resultado[]>(() => turmas.flatMap((t) => {
     if (!t.dataInicio || !dataCadastroValida || dataPosteriorAoCadastro(t.dataInicio) || !parametrosOficiais) return [];
-    const categorias: Resultado[] = [];
-    const distribuicao = distribuirMatriculas(t.alunosRegulares, t.especial ? t.alunosEspeciais : 0);
-    if (t.regular && distribuicao.regularesSemEspecial > 0) {
-      const modalidade: Modalidade = "Regular";
-      const calculo = calcularRepassePrograma({ programa: "turmas", dataInicio: t.dataInicio, dataRegistroSimec: dataCadastro, etapa: t.etapa, turno: t.turno, alunos: distribuicao.regularesSemEspecial, vaafInformado: vaaf });
-      if (calculo) categorias.push({ chave: `${t.id}-regular`, etapa: t.etapa, turno: t.turno, modalidade, dataInicio: t.dataInicio, fator: calculo.fator, alunos: distribuicao.regularesSemEspecial, meses: calculo.meses, valorAnual: calculo.valorAnual, repasse: calculo.repasse });
-    }
-    if (t.especial && distribuicao.especiais > 0) {
-      const modalidade: Modalidade = "Educação Especial";
-      const calculo = calcularRepassePrograma({ programa: "turmas", dataInicio: t.dataInicio, dataRegistroSimec: dataCadastro, etapa: t.etapa, turno: t.turno, alunos: distribuicao.especiais, vaafInformado: vaaf });
-      if (calculo) categorias.push({ chave: `${t.id}-especial`, etapa: t.etapa, turno: t.turno, modalidade, dataInicio: t.dataInicio, fator: calculo.fator, alunos: distribuicao.especiais, meses: calculo.meses, valorAnual: calculo.valorAnual, repasse: calculo.repasse });
-    }
-    return categorias;
+    if (!t.regular || t.alunosRegulares <= 0) return [];
+    const modalidade: Modalidade = "Regular";
+    const calculo = calcularRepassePrograma({ programa: "turmas", dataInicio: t.dataInicio, dataRegistroSimec: dataCadastro, etapa: t.etapa, turno: t.turno, alunos: t.alunosRegulares, vaafInformado: vaaf });
+    if (!calculo) return [];
+    return [{ chave: `${t.id}-regular`, etapa: t.etapa, turno: t.turno, modalidade, dataInicio: t.dataInicio, fator: calculo.fator, alunos: t.alunosRegulares, meses: calculo.meses, valorAnual: calculo.valorAnual, repasse: calculo.repasse }];
   }), [turmas, vaaf, dataCadastro, dataCadastroValida, dataPosteriorAoCadastro, parametrosOficiais]);
   const mesesEstabelecimento = dataInicioEstabelecimento && dataCadastroValida && !dataPosteriorAoCadastro(dataInicioEstabelecimento) ? mesesDeFuncionamento(dataInicioEstabelecimento, dataCadastro) : 0;
-  const resultadosEstabelecimento = useMemo<Resultado[]>(() => paresEstabelecimento.flatMap(({ regular, especial }) => {
+  const resultadosEstabelecimento = useMemo<Resultado[]>(() => paresEstabelecimento.flatMap(({ regular }) => {
     if (!parametrosOficiais) return [];
     const total = quantidades[regular.chave] ?? 0;
-    const distribuicao = distribuirMatriculas(total, especial ? quantidades[especial.chave] ?? 0 : 0);
-    const linhas: Resultado[] = [];
-    if (distribuicao.regularesSemEspecial > 0) {
-      const calculo = calcularRepassePrograma({ programa: "estabelecimentos", dataInicio: dataInicioEstabelecimento, dataRegistroSimec: dataCadastro, etapa: regular.etapa, turno: regular.turno, alunos: distribuicao.regularesSemEspecial, vaafInformado: vaaf });
-      if (calculo) linhas.push({ chave: regular.chave, etapa: regular.etapa, turno: regular.turno, modalidade: regular.modalidade, dataInicio: dataInicioEstabelecimento, fator: calculo.fator, alunos: distribuicao.regularesSemEspecial, meses: calculo.meses, valorAnual: calculo.valorAnual, repasse: calculo.repasse });
-    }
-    if (especial && distribuicao.especiais > 0) {
-      const calculo = calcularRepassePrograma({ programa: "estabelecimentos", dataInicio: dataInicioEstabelecimento, dataRegistroSimec: dataCadastro, etapa: especial.etapa, turno: especial.turno, alunos: distribuicao.especiais, vaafInformado: vaaf });
-      if (calculo) linhas.push({ chave: especial.chave, etapa: especial.etapa, turno: especial.turno, modalidade: especial.modalidade, dataInicio: dataInicioEstabelecimento, fator: calculo.fator, alunos: distribuicao.especiais, meses: calculo.meses, valorAnual: calculo.valorAnual, repasse: calculo.repasse });
-    }
-    return linhas;
+    if (total <= 0) return [];
+    const calculo = calcularRepassePrograma({ programa: "estabelecimentos", dataInicio: dataInicioEstabelecimento, dataRegistroSimec: dataCadastro, etapa: regular.etapa, turno: regular.turno, alunos: total, vaafInformado: vaaf });
+    if (!calculo) return [];
+    return [{ chave: regular.chave, etapa: regular.etapa, turno: regular.turno, modalidade: regular.modalidade, dataInicio: dataInicioEstabelecimento, fator: calculo.fator, alunos: total, meses: calculo.meses, valorAnual: calculo.valorAnual, repasse: calculo.repasse }];
   }), [quantidades, vaaf, dataCadastro, dataInicioEstabelecimento, parametrosOficiais]);
   const resultados = dadosValidos ? (modo === "turmas" ? resultadosTurmas : resultadosEstabelecimento) : [];
   const totalAlunos = resultados.reduce((s, r) => s + r.alunos, 0);
@@ -219,7 +204,7 @@ function Index() {
        <Field label="Data de início" required><input aria-invalid={!dataInicioEstabelecimento || dataPosteriorAoCadastro(dataInicioEstabelecimento)} className={`${campo} ${!dataInicioEstabelecimento || dataPosteriorAoCadastro(dataInicioEstabelecimento) ? campoErro : ""}`} type="date" value={dataInicioEstabelecimento} onChange={(e) => setDataInicioEstabelecimento(e.target.value)} /></Field>
         <Field label="Meses considerados"><div className="flex h-[42px] items-center rounded-md bg-brand/8 px-3 font-display font-bold text-brand-deep">{!dataInicioEstabelecimento || !dataCadastroValida || dataPosteriorAoCadastro(dataInicioEstabelecimento) ? "—" : `${mesesEstabelecimento} meses`}</div></Field>
     </div>{escola && <div className="mt-4 flex items-start gap-3 border-l-4 border-special bg-special/8 px-4 py-3"><CheckCircle2 className="mt-0.5 size-5 shrink-0 text-special" /><div><p className="font-semibold">{escola.nome}</p><p className="text-xs text-ink/55">{escola.municipio}/{escola.uf} · {escola.situacao} · {escola.fonte}</p>{(escola.uf !== uf || String(municipios.find((m) => m.nome === escola.municipio)?.id ?? "") !== municipioId) && <p className="mt-1 text-xs font-semibold text-destructive">A localização da escola não corresponde ao município selecionado.</p>}</div></div>}
-    <p className="mt-6 text-sm text-ink/55">Em Regular, informe o total de alunos. Em Especial, informe somente quantos desse total são especiais.</p><div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">{COMBINACOES.map((c) => <label key={c.chave} className="flex items-center justify-between gap-4 border-b border-ink/8 pb-3"><span className="text-sm font-medium">{c.rotulo}<small className="mt-0.5 block text-ink/45">{c.modalidade === "Regular" ? "Total, incluindo especiais" : "Parte do total regular"} · Fator {parametrosOficiais ? fatorFmt(calcularFator(c.etapa, c.turno, c.modalidade, anoBaseAtual)) : "—"}</small></span><input className={`${campo} w-24 text-right font-semibold tabular-nums`} type="number" min="0" value={quantidades[c.chave] || ""} placeholder="0" onChange={(e) => setQuantidades((q) => ({ ...q, [c.chave]: Math.max(0, Number(e.target.value) || 0) }))} /></label>)}</div></section>}
+    <p className="mt-6 text-sm text-ink/55">Em Regular, informe o total de alunos. Em Especial, informe somente quantos desse total são especiais; essa marcação não cria uma matrícula nem um valor adicional.</p><div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">{COMBINACOES.map((c) => <label key={c.chave} className="flex items-center justify-between gap-4 border-b border-ink/8 pb-3"><span className="text-sm font-medium">{c.rotulo}<small className="mt-0.5 block text-ink/45">{c.modalidade === "Regular" ? "Total, incluindo especiais" : "Parte do total regular"} · Fator {parametrosOficiais ? fatorFmt(calcularFator(c.etapa, c.turno, c.modalidade, anoBaseAtual)) : "—"}</small></span><input className={`${campo} w-24 text-right font-semibold tabular-nums`} type="number" min="0" value={quantidades[c.chave] || ""} placeholder="0" onChange={(e) => setQuantidades((q) => ({ ...q, [c.chave]: Math.max(0, Number(e.target.value) || 0) }))} /></label>)}</div></section>}
 
     {avisos.length > 0 && <Alert variant="destructive" className="mt-5 bg-background"><AlertCircle /><AlertTitle>Revise os dados antes do cálculo</AlertTitle><AlertDescription><ul className="mt-2 list-disc space-y-1 pl-4">{avisos.map((aviso) => <li key={aviso}>{aviso}</li>)}</ul></AlertDescription></Alert>}
     <section className="mt-5 bg-gradient-to-r from-brand to-brand-deep p-5 text-primary-foreground shadow-sm sm:p-7"><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-semibold uppercase text-primary-foreground/70">Valor total do repasse previsto</p><p className="mt-2 font-display text-3xl font-bold tabular-nums sm:text-5xl">{dadosValidos ? brl(totalRepasse) : "Aguardando dados"}</p></div><div className="flex gap-6 text-right"><Stat label="Matrículas" valor={totalAlunos} /><Stat label={modo === "turmas" ? "Turmas" : "Categorias"} valor={modo === "turmas" ? turmas.length : resultados.length} /></div></div></section>
