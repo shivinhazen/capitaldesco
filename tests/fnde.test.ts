@@ -176,3 +176,80 @@ test("quantidades negativas são saneadas", () =>
 
 test("parâmetros inexistentes são recusados em vez de inventados", () =>
   assert.equal(obterParametrosFundeb("estabelecimentos", "2024-06-01", "2024-06-10"), null));
+
+test("VAAF-MIN versionado acompanha os parâmetros usados pelo motor", () => {
+  assert.equal(PARAMETROS_FUNDEB[2024].vaafMin, 5648.91);
+  assert.equal(PARAMETROS_FUNDEB[2025].vaafMin, 5696.84);
+  assert.equal(PARAMETROS_FUNDEB[2026].vaafMin, 6030.44);
+});
+
+test("ano sem parâmetros não cai silenciosamente no exercício corrente", () => {
+  assert.throws(
+    () => calcularFator("Creche", "Integral", "Regular", 2030),
+    /Não há parâmetros oficiais cadastrados/,
+  );
+});
+
+test("início exatamente no Censo limita apoio até o Fundeb do exercício seguinte", () =>
+  assert.equal(mesesDeFuncionamento("2026-05-27", "2026-05-27"), 8));
+
+test("início logo após o Censo permanece sujeito ao teto de 18 meses", () =>
+  assert.equal(mesesDeFuncionamento("2026-05-28", "2026-05-28"), 18));
+
+test("turma iniciada em novembro e registrada em janeiro recebe apenas o exercício subsequente", () =>
+  assert.equal(mesesDeFuncionamento("2026-11-10", "2027-01-05"), 12));
+
+test("registro no primeiro dia em que o Fundeb já deveria contemplar a matrícula não gera apoio", () =>
+  assert.equal(mesesDeFuncionamento("2025-05-28", "2026-01-01"), 0));
+
+test("override manual de VAAF percorre a API de programa sem alterar o ano-base", () => {
+  const linha = calcularRepassePrograma({
+    programa: "turmas",
+    dataInicio: "2026-06-01",
+    dataRegistroSimec: "2026-06-15",
+    etapa: "Creche",
+    turno: "Integral",
+    alunos: 10,
+    vaafInformado: 6000,
+  });
+  assert.ok(linha);
+  assert.equal(linha.anoBase, 2026);
+  assert.equal(linha.valorUnitario, 9300);
+  assert.equal(linha.repasse, 139500);
+});
+
+test("separar um subconjunto Especial não altera o total financeiro da categoria", () => {
+  const integral = calcularRepassePrograma({
+    programa: "turmas",
+    dataInicio: "2026-06-01",
+    dataRegistroSimec: "2026-06-15",
+    etapa: "Creche",
+    turno: "Parcial",
+    alunos: 20,
+  });
+  const regulares = calcularRepassePrograma({
+    programa: "turmas",
+    dataInicio: "2026-06-01",
+    dataRegistroSimec: "2026-06-15",
+    etapa: "Creche",
+    turno: "Parcial",
+    alunos: 17,
+  });
+  const especiais = calcularRepassePrograma({
+    programa: "turmas",
+    dataInicio: "2026-06-01",
+    dataRegistroSimec: "2026-06-15",
+    etapa: "Creche",
+    turno: "Parcial",
+    alunos: 3,
+  });
+  assert.ok(integral && regulares && especiais);
+  assert.equal(arredondarMoeda(regulares.repasse + especiais.repasse), integral.repasse);
+});
+
+test("NaN e infinito não contaminam o total financeiro", () => {
+  assert.deepEqual(calcularRepasse(Number.NaN, Number.POSITIVE_INFINITY, 18), {
+    valorAnual: 0,
+    repasse: 0,
+  });
+});
