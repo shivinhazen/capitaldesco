@@ -111,11 +111,11 @@ function Index() {
     setFonteVaaf(`${parametrosOficiais.fonte} · ${parametrosOficiais.ato}`);
   }, [anoBaseAtual, dataCadastro, parametrosOficiais]);
 
-  const errosGerais = [!uf ? "Selecione o estado." : "", !municipioId ? "Selecione o município." : "", !dataCadastroValida ? "Informe a data de registro no Simec." : "", !parametrosOficiais ? `Não há parâmetros oficiais cadastrados para o Fundeb ${anoBaseAtual}.` : "", parametrosOficiais && !vaafValido ? "Informe um VAAF maior que zero." : ""].filter(Boolean);
+  const errosGerais = [!uf ? "Selecione o estado." : "", !municipioId ? "Selecione o município." : "", !dataCadastroValida ? "Informe a data de registro/envio no Simec." : "", !parametrosOficiais ? `Não há parâmetros oficiais cadastrados para o Fundeb ${anoBaseAtual}.` : "", parametrosOficiais && !vaafValido ? "Informe um VAAF maior que zero." : ""].filter(Boolean);
   const errosTurmas = turmas.flatMap((t, i) => {
     const erros: string[] = [];
     if (!t.dataInicio) erros.push(`Turma ${i + 1}: informe a data de início.`);
-    else if (dataPosteriorAoCadastro(t.dataInicio)) erros.push(`Turma ${i + 1}: a data de início não pode ser posterior ao registro no Simec.`);
+    else if (dataPosteriorAoCadastro(t.dataInicio)) erros.push(`Turma ${i + 1}: a data de início não pode ser posterior ao registro/envio no Simec.`);
     else if (dataCadastroValida && mesesDeFuncionamento(t.dataInicio, dataCadastro) <= 0) erros.push(`Turma ${i + 1}: o prazo máximo de 18 meses já terminou.`);
     if (!t.regular) erros.push(`Turma ${i + 1}: marque Regular, pois os alunos especiais fazem parte do total regular.`);
     if (t.regular && t.alunosRegulares <= 0) erros.push(`Turma ${i + 1}: informe a quantidade de alunos regulares.`);
@@ -128,7 +128,7 @@ function Index() {
     const especiais = especial ? quantidades[especial.chave] ?? 0 : 0;
     return especiais > total ? [`${regular.etapa} ${regular.turno}: alunos especiais não podem superar o total regular.`] : [];
   });
-  const errosEstabelecimento = [!dataInicioEstabelecimento ? "Informe a data de início do estabelecimento." : "", dataPosteriorAoCadastro(dataInicioEstabelecimento) ? "A data de início do estabelecimento não pode ser posterior ao registro no Simec." : "", dataInicioEstabelecimento && dataCadastroValida && !dataPosteriorAoCadastro(dataInicioEstabelecimento) && mesesDeFuncionamento(dataInicioEstabelecimento, dataCadastro) <= 0 ? "O prazo máximo de 18 meses do estabelecimento já terminou." : "", paresEstabelecimento.every(({ regular }) => (quantidades[regular.chave] ?? 0) <= 0) ? "Informe ao menos uma matrícula regular." : "", ...errosQuantidadesEstabelecimento].filter(Boolean);
+  const errosEstabelecimento = [!dataInicioEstabelecimento ? "Informe a data de início do estabelecimento." : "", dataPosteriorAoCadastro(dataInicioEstabelecimento) ? "A data de início do estabelecimento não pode ser posterior ao registro/envio no Simec." : "", dataInicioEstabelecimento && dataCadastroValida && !dataPosteriorAoCadastro(dataInicioEstabelecimento) && mesesDeFuncionamento(dataInicioEstabelecimento, dataCadastro) <= 0 ? "O prazo máximo de 18 meses do estabelecimento já terminou." : "", paresEstabelecimento.every(({ regular }) => (quantidades[regular.chave] ?? 0) <= 0) ? "Informe ao menos uma matrícula regular." : "", ...errosQuantidadesEstabelecimento].filter(Boolean);
   const avisos = [...errosGerais, ...(modo === "turmas" ? errosTurmas : errosEstabelecimento)];
   const dadosValidos = avisos.length === 0;
 
@@ -173,7 +173,7 @@ function Index() {
       doc.setFontSize(9); doc.text("Programa de Repasse FNDE", 72, 24); doc.setTextColor(25, 34, 53); doc.setFontSize(10);
       doc.text(`Município: ${municipio} / ${uf}`, 14, 44); doc.text(`VAAF base: ${brl(vaaf)}`, 14, 51); doc.text(`Fonte: ${fonteVaaf}`, 14, 58, { maxWidth: 182 });
       let inicioTabela = 68;
-       doc.text(`Registro no Simec: ${formatarData(dataCadastro)}`, 14, 65);
+       doc.text(`Registro/envio no Simec: ${formatarData(dataCadastro)}`, 14, 65);
        inicioTabela = 74;
         if (modo === "estabelecimentos") { doc.text(escola ? `Escola: ${escola.nome} · INEP ${inep}` : `INEP: ${inep || "não informado / aguardando cadastro"}`, 14, 72, { maxWidth: 182 }); doc.text(`Início: ${formatarData(dataInicioEstabelecimento)} · Meses considerados: ${mesesEstabelecimento}`, 14, 79); inicioTabela = 87; }
        const linhas = resultados.map((r) => [`${r.etapa} / ${r.turno}`, r.modalidade === "Educação Especial" ? "Especial" : "Regular", formatarData(r.dataInicio), String(r.meses), fatorFmt(r.fator), String(r.alunos), brl(r.valorAnual), brl(r.repasse)]);
@@ -185,13 +185,13 @@ function Index() {
   }
 
   return <main className="bg-civic-mesh min-h-screen text-ink"><div className="mx-auto max-w-7xl px-4 py-5 sm:px-7 sm:py-8">
-    <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-md bg-brand font-display font-bold text-primary-foreground shadow-sm">FDE</div><div><h1 className="font-display text-lg font-bold">Calculadora de Repasse FNDE</h1><p className="text-xs text-ink/55">Novas Turmas e Novos Estabelecimentos</p></div></div><div className="flex items-center gap-2"><span className="hidden rounded-full border border-special/25 bg-background/80 px-3 py-2 text-xs font-semibold text-special sm:inline">FUNDEB · {ANO_REFERENCIA}</span><Button onClick={exportarPdf} disabled={exportando || !dadosValidos || resultados.length === 0} className="bg-brand text-primary-foreground hover:bg-brand-deep">{exportando ? <Loader2 className="animate-spin" /> : <FileDown />} Exportar PDF</Button></div></header>
+    <header className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-md bg-brand font-display font-bold text-primary-foreground shadow-sm">FDE</div><div><h1 className="font-display text-lg font-bold">Calculadora de Repasse FNDE</h1><p className="text-xs text-ink/55">Novas Turmas e Novos Estabelecimentos</p></div></div><div className="flex items-center gap-2"><span className="hidden rounded-full border border-special/25 bg-background/80 px-3 py-2 text-xs font-semibold text-special sm:inline">FUNDEB · {anoBaseAtual}</span><Button onClick={exportarPdf} disabled={exportando || !dadosValidos || resultados.length === 0} className="bg-brand text-primary-foreground hover:bg-brand-deep">{exportando ? <Loader2 className="animate-spin" /> : <FileDown />} Exportar PDF</Button></div></header>
     <nav className="mt-7 grid max-w-xl grid-cols-1 rounded-lg border border-ink/10 bg-background/75 p-1 shadow-sm sm:grid-cols-2" aria-label="Tipo de cálculo"><Button variant="ghost" onClick={() => setModo("turmas")} className={modo === "turmas" ? "bg-brand text-primary-foreground hover:bg-brand hover:text-primary-foreground" : "text-ink/60"}><School /> Novas Turmas</Button><Button variant="ghost" onClick={() => setModo("estabelecimentos")} className={modo === "estabelecimentos" ? "bg-brand text-primary-foreground hover:bg-brand hover:text-primary-foreground" : "text-ink/60"}><Building2 /> Novos Estabelecimentos</Button></nav>
 
     <section className="mt-5 border-y border-ink/8 bg-background/75 px-4 py-5 shadow-sm sm:px-6"><SectionTitle numero="1" titulo="Localidade, registro e valor de referência" /><div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="Estado (UF)" required><select aria-invalid={!uf} className={`${campo} ${!uf ? campoErro : ""}`} value={uf} onChange={(e) => setUf(e.target.value)}><option value="">Selecione</option>{ufs.map((u) => <option key={u.id} value={u.sigla}>{u.nome}</option>)}</select></Field>
       <Field label="Município" required><select aria-invalid={!municipioId} className={`${campo} ${!municipioId ? campoErro : ""}`} value={municipioId} onChange={(e) => setMunicipioId(e.target.value)} disabled={!uf || carregandoLocalidades}><option value="">{carregandoLocalidades && uf ? "Carregando..." : "Selecione"}</option>{municipios.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}</select></Field>
-      <Field label="Data de registro no Simec" required><input aria-invalid={!dataCadastroValida} className={`${campo} ${!dataCadastroValida ? campoErro : ""}`} type="date" value={dataCadastro} onChange={(e) => setDataCadastro(e.target.value)} /></Field>
+      <Field label="Data de registro/envio no Simec" required><input aria-invalid={!dataCadastroValida} className={`${campo} ${!dataCadastroValida ? campoErro : ""}`} type="date" value={dataCadastro} onChange={(e) => setDataCadastro(e.target.value)} /></Field>
       <Field label="VAAF Base do FUNDEB (R$)" required><div className="flex gap-2"><input aria-invalid={!vaafValido} className={`${campo} ${!vaafValido ? campoErro : ""}`} type="number" min="0.01" step="0.01" value={vaaf || ""} onChange={(e) => { setVaaf(Number(e.target.value)); setFonteVaaf("Valor informado manualmente pelo usuário."); }} /><Button variant="outline" size="icon" onClick={restaurarVaafOficial} disabled={!parametrosOficiais} title="Restaurar valor oficial"><RefreshCw /></Button></div></Field>
     </div><p className="mt-3 flex gap-2 text-[11px] leading-relaxed text-ink/50"><Info className="mt-0.5 size-3.5 shrink-0" />{fonteVaaf}</p></section>
 
