@@ -1,78 +1,129 @@
-# FNDE Repasse Calc
+# CapitalDesco — Calculadora de Repasse FNDE
 
-Crie uma aplicação web responsiva em React (usando Tailwind CSS e shadcn/ui) que funcione como uma "Calculadora de Repasse FNDE - Novas Turmas e Novos Estabelecimentos". O design deve ser limpo, moderno e focado na usabilidade de servidores públicos.
+Aplicação web para simular repasses do FNDE em **Novas Turmas** e **Novos Estabelecimentos**, com cálculo por categoria de educação infantil, período elegível, parâmetros Fundeb versionados e exportação em PDF.
 
-A aplicação deve ser dividida em três seções principais:
+**Aplicação publicada:** https://capitaldesco.lovable.app
 
-1. CONFIGURAÇÕES GERAIS (Inputs):
+> O README antigo reproduzia o prompt inicial usado para gerar o projeto no Lovable. Ele foi substituído porque aquele texto continha regras provisórias e valores que não devem ser usados como fonte de verdade para o cálculo.
 
-- Input numérico: "VAAF Base do FUNDEB (R$)" (Valor padrão: 5962.79).
+## Estado do projeto
 
-- Select dropdown: "Mês de Inauguração" (Opções de Janeiro a Dezembro).
+O projeto continua visualmente baseado na versão criada no Lovable. A prioridade atual é manter a experiência existente e melhorar o que fica por baixo dela:
 
-  * Lógica invisível: O mês selecionado determina os "Meses de Funcionamento" no ano (ex: Janeiro = 12, Fevereiro = 11, ..., Dezembro = 1).
+- cálculo reproduzível e fundamentado em regras públicas do FNDE;
+- parâmetros Fundeb separados por exercício;
+- casos reais de regressão;
+- validação automática antes de integrar mudanças;
+- menor dependência de consultas externas em tempo de uso;
+- manutenção simples para exercícios futuros.
 
-2. ADIÇÃO DE MATRÍCULAS APROVADAS (Formulário Dinâmico):
+Não há objetivo de redesenhar a interface. Mudanças visuais devem ser feitas apenas quando algo estiver quebrado, confuso ou prejudicar o uso.
 
-Crie um formulário onde o usuário possa adicionar várias "linhas" de turmas. Cada linha deve ter:
+## Stack
 
-- Select "Etapa de Ensino": Creche ou Pré-escola.
+- TanStack Start
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui / Radix UI
+- Bun como gerenciador/runtime preferencial
+- jsPDF para relatórios
 
-- Select "Turno": Integral ou Parcial.
+## Estrutura relevante
 
-- Select "Modalidade": Regular ou Educação Especial.
+~~~text
+src/
+  lib/
+    fnde.ts              # motor de cálculo e parâmetros anuais
+    vaaf.functions.ts    # acesso aos parâmetros oficiais versionados
+    ibge.ts              # estados e municípios, com cache em sessão
+    escola.functions.ts  # consulta local da base INEP
+  routes/
+    index.tsx             # interface principal
 
-- Input numérico: "Quantidade de Alunos".
+tests/
+  fnde.test.ts            # suíte de regressão do cálculo
 
-- Botão: "Remover" (para excluir a linha) e um botão "Adicionar Nova Turma" no final da lista.
+docs/
+  fnde-calculation.md     # regra de negócio e casos-ouro
+  ai-development.md       # protocolo AI-first para desenvolvimento
 
-3. LÓGICA DE CÁLCULO E TABELA DE RESULTADOS:
+.github/workflows/
+  quality.yml             # testes + lint + build
+~~~
 
-Abaixo do formulário, exiba um Dashboard (Cards) e uma Tabela de Resultados atualizados em tempo real.
+## Desenvolvimento
 
-Regras Matemáticas:
+### Pré-requisitos
 
-- Fatores de Ponderação padrão:
+Bun é o caminho preferencial:
 
-  * Creche + Integral = 1.40
+~~~bash
+bun install
+bun run dev
+~~~
 
-  * Creche + Parcial = 1.20
+Também é possível usar npm quando necessário.
 
-  * Pré-escola + Integral = 1.30
+### Quality gate
 
-  * Pré-escola + Parcial = 1.10
+Antes de considerar uma alteração pronta:
 
-- Se "Modalidade" for "Educação Especial", o fator aplicável deve ser 1.20 (ou o fator da etapa/turno, se este for maior).
+~~~bash
+bun run test
+bun run lint
+bun run build
+~~~
 
-- Valor Anual da Turma = (VAAF Base * Fator de Ponderação) * Quantidade de Alunos.
+O GitHub Actions executa os mesmos gates automaticamente.
 
-- Valor Total do Repasse da Turma = (Valor Anual da Turma / 12) * Meses de Funcionamento.
+## Regras de negócio
 
-Exibição dos Resultados:
+A fonte de verdade da implementação é:
 
-- Card em destaque (Destaque visual): "Valor Total do Repasse Previsto (R$)" (Soma do repasse de todas as turmas adicionadas).
+1. legislação e atos oficiais do FNDE/Fundeb;
+2. casos reais já calculados pelo FNDE;
+3. testes automatizados que registram esses comportamentos.
 
-- Tabela detalhada listando cada turma adicionada, mostrando: Etapa, Turno, Fator Aplicado, Qtd Alunos, Valor Anual e o Repasse Proporcional (R$). Todos os valores monetários devem ser formatados em Reais (BRL).
+A interface, prompts antigos do Lovable e comentários históricos **não são fonte de verdade** para o cálculo.
 
-This project was built with [Lovable](https://lovable.dev).
+A documentação completa está em [docs/fnde-calculation.md](docs/fnde-calculation.md).
 
-**Live app**: https://capitaldesco.lovable.app
+## Casos de regressão
 
-## Build with Lovable
+A suíte contém casos normativos, limites e exemplos reais. Entre eles:
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/79a39957-72d4-4c24-abaa-d8876d7385e7).
+- **Simplício Mendes/PI:** total esperado de R$ 722.928,00;
+- **Vicentinópolis/GO:** total esperado de R$ 147.248,33.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+Esses valores precisam continuar sendo reproduzidos centavo por centavo.
 
-## Development
+## Desenvolvimento com IA
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Este repositório foi preparado para trabalho AI-first.
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+Qualquer agente deve começar por:
+
+1. ler [AGENTS.md](AGENTS.md);
+2. ler [docs/ai-development.md](docs/ai-development.md);
+3. ler [docs/fnde-calculation.md](docs/fnde-calculation.md) antes de alterar cálculo;
+4. executar os testes antes e depois da mudança;
+5. preservar o frontend por padrão;
+6. nunca inventar regra ou valor de FNDE para “fazer o teste passar”.
+
+## Git, Lovable e deploy
+
+O repositório original desconet/capitaldesco está conectado ao Lovable.
+
+- O fork shivinhazen/capitaldesco é usado para desenvolvimento e revisão.
+- Alterações no fork **não** devem ser tratadas como publicadas.
+- A sincronização com o Lovable ocorre quando mudanças aprovadas chegam ao branch conectado do repositório original.
+- Não reescreva histórico já publicado no repositório conectado ao Lovable.
+- Prefira branch → testes → Pull Request → revisão → merge.
+
+## Atualização anual
+
+Quando entrar um novo exercício do Fundeb, não substitua parâmetros históricos.
+
+Adicione uma nova entrada versionada, registre a fonte normativa e crie testes correspondentes. O procedimento está detalhado em [docs/fnde-calculation.md](docs/fnde-calculation.md).
