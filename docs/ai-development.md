@@ -1,278 +1,248 @@
 # Desenvolvimento AI-first
 
-Este documento permite que uma IA nova entre no projeto e produza mudanças seguras sem precisar reconstruir todo o contexto das conversas que originaram o sistema.
+Este documento reduz a dependência de contexto de conversa: uma IA nova deve conseguir entender o produto, localizar a fonte de verdade e continuar o trabalho sem reconstruir todo o histórico do Lovable.
 
-Ele complementa o AGENTS.md. O AGENTS.md define as regras operacionais; este arquivo explica como trabalhar no projeto.
+O `AGENTS.md` contém as regras operacionais obrigatórias. Este arquivo explica o modelo de trabalho.
 
 ## 1. Objetivo do produto
 
-O CapitalDesco é uma calculadora de apoio para estimar repasses FNDE relacionados a:
+CapitalDesco é uma calculadora de apoio para estimar repasses FNDE de:
 
 - Novas Turmas;
 - Novos Estabelecimentos.
 
-O usuário informa localidade, datas, categorias e matrículas. O sistema calcula o período elegível, aplica os parâmetros Fundeb correspondentes e apresenta o resultado, inclusive em PDF.
+O usuário informa localidade, datas, categorias e matrículas. A aplicação determina o período elegível, aplica o snapshot Fundeb suportado e apresenta os valores, inclusive em PDF.
 
-O produto deve priorizar:
+Prioridades, nesta ordem:
 
-1. correção do cálculo;
+1. correção;
 2. previsibilidade;
-3. resposta rápida;
+3. desempenho percebido;
 4. mensagens claras;
 5. manutenção simples;
-6. preservação da interface já conhecida pelo usuário.
+6. preservação da interface existente.
 
-## 2. O que este projeto não é
+## 2. O que o projeto não é
 
-Não é um exercício de redesign.
+- Não é um projeto de redesign.
+- Não é uma demonstração de framework.
+- Não é aceitável aproximar uma regra do FNDE para simplificar código.
+- Não é aceitável usar o resultado atual da própria aplicação como prova de correção.
+- Não é aceitável mascarar ano/parâmetro desconhecido com fallback silencioso.
 
-Não é uma demonstração de framework.
+## 3. Hierarquia de evidência
 
-Não é aceitável “aproximar” a regra do FNDE para simplificar implementação.
+### Nível 1 — fonte normativa/oficial
 
-Não é aceitável usar a resposta atual da aplicação como prova de que a própria aplicação está certa.
-
-## 3. Fontes de verdade
-
-### Nível 1 — autoridade externa
-
-Legislação, resoluções, portarias e valores oficiais do FNDE/Fundeb.
+Resoluções, portarias e publicações do FNDE/Fundeb.
 
 ### Nível 2 — evidência operacional
 
-Exemplos reais cujo resultado foi calculado pelo FNDE.
+Telas/documentos reais cujo resultado foi calculado pelo FNDE.
 
 ### Nível 3 — especificação executável
 
-Testes automatizados.
+Testes automatizados que registram o comportamento validado.
 
 ### Nível 4 — código
 
-O código deve implementar os níveis anteriores.
+A implementação deve obedecer aos níveis anteriores.
 
-Uma IA nunca deve promover o nível 4 a fonte de verdade para justificar uma regra do nível 1.
+Quando houver conflito, subir na hierarquia; nunca justificar uma regra oficial porque “o código já fazia assim”.
 
-## 4. Contexto histórico importante
+## 4. Contexto histórico relevante
 
-O projeto nasceu de um prompt no Lovable. Esse prompt inicial continha números e simplificações que foram úteis para gerar uma primeira versão visual, mas não constituem uma especificação normativa.
+A primeira versão veio de um prompt no Lovable. Esse prompt foi útil para gerar UI, mas continha simplificações e não é norma.
 
-Erros que já apareceram no histórico:
+Classes de erro já encontradas no projeto:
 
-- parâmetro de 2022 armazenado com nome de 2026;
-- valor exibido pela interface diferente do valor realmente usado pela função;
-- data recebida pela função e ignorada;
-- alterações sucessivas na interpretação dos 18 meses;
-- tentativa de obter VAAF por scraping de página externa;
-- lógica de cálculo misturada com apresentação.
+- valor histórico nomeado como se fosse de 2026;
+- VAAF exibido diferente do efetivamente calculado;
+- parâmetro de data recebido e ignorado;
+- sucessivas interpretações incompatíveis dos 18 meses;
+- scraping de página externa para um parâmetro nacional/versionável;
+- regra de negócio misturada com renderização;
+- risco de dupla contagem de matrículas especiais;
+- risco de diferença de centavos ao dividir uma mesma categoria em linhas artificiais.
 
-Ao trabalhar aqui, trate esses padrões como classes de regressão a evitar.
+Trate esses itens como regressões conhecidas.
 
-## 5. Mapa mental da arquitetura
+## 5. Mapa da arquitetura
 
-### Motor FNDE — src/lib/fnde.ts
+### `src/lib/fnde.ts` — domínio
 
-Deve conter funções puras sempre que possível:
+Deve concentrar funções determinísticas:
 
-- parâmetros anuais;
+- snapshots Fundeb suportados;
 - fatores;
 - valores aluno/ano;
-- regra de Censo;
-- regra de período;
-- arredondamento;
-- cálculo;
-- distribuição de matrículas.
+- Censo Escolar;
+- escolha de ano-base;
+- período elegível;
+- cálculo monetário;
+- validações/regras de matrículas que sejam de domínio.
 
-Se uma regra pode ser testada sem navegador, ela provavelmente deve estar aqui ou em outro módulo de domínio, não em index.tsx.
+A matemática financeira usa valores publicados em centavos e deve continuar determinística.
 
-### Interface — src/routes/index.tsx
+### `src/routes/index.tsx` — interface/orquestração
 
-Responsabilidades aceitáveis:
+Responsabilidades:
 
 - estado de formulário;
-- seleção de modo;
-- validação de entrada para UX;
-- chamada às funções de domínio;
-- apresentação de resultado;
-- geração do PDF.
+- seleção de programa;
+- validação de UX;
+- chamada ao domínio;
+- resultado;
+- PDF.
 
-Evite colocar nova regra FNDE diretamente neste arquivo.
+Não reimplementar fórmula FNDE dentro do JSX.
 
-### Dados externos
+### `src/lib/ibge.ts`
 
-src/lib/ibge.ts e src/lib/escola.functions.ts.
+Busca estados/municípios e mantém cache em memória. Rede é auxiliar, não fonte do cálculo financeiro.
 
-Serviços externos devem ser tratados como falíveis.
+### `src/lib/escola.functions.ts`
 
-Uma indisponibilidade de IBGE/INEP não deve alterar silenciosamente a matemática do repasse.
-
-### Parâmetros Fundeb
-
-src/lib/vaaf.functions.ts.
-
-A aplicação usa parâmetros versionados no projeto para comportamento determinístico. Não reintroduza scraping de HTML como fonte automática de cálculo.
+Consulta a base INEP usada pelo projeto. Falha de consulta não deve alterar a matemática do repasse.
 
 ## 6. Estratégia de testes
 
-A suíte deve ser tratada como uma especificação executável.
+### A. Unidades puras
 
-### Camada A — unidades puras
+Cobrir:
 
-Exemplos:
-
-- cálculo do Dia Nacional do Censo;
-- escolha do ano-base;
+- Dia Nacional do Censo;
+- ano-base;
 - período elegível;
+- limites;
 - fatores;
-- arredondamento;
-- distribuição de matrículas.
+- centavos/arredondamento;
+- matrículas.
 
-### Camada B — regras anuais
+### B. Snapshots anuais
 
-Para cada exercício suportado:
+Cada exercício/snapshot suportado deve ter testes dos valores relevantes e da origem documental.
 
-- VAAF mínimo;
-- quatro valores aluno/ano;
-- fatores aplicáveis;
-- ato/fonte registrado.
+### C. Golden tests
 
-### Camada C — golden tests
+Casos reais calculados pelo FNDE. Não dependem de rede e não podem ser “atualizados” para acomodar uma regressão.
 
-Casos reais do FNDE.
+### D. Integrações auxiliares
 
-Os dois casos iniciais estão documentados em docs/fnde-calculation.md.
+Mockar rede para testar cache, normalização e falhas previsíveis.
 
-Golden tests não devem depender da rede.
+### E. UI/E2E
 
-### Camada D — integração/UI
-
-Quando adicionada, deve verificar fluxos essenciais sem duplicar todas as regras do domínio.
-
-Prioridades:
-
-- troca entre os dois programas;
-- preenchimento mínimo válido;
-- mensagens de erro;
-- resultado exibido;
-- PDF;
-- comportamento quando serviços auxiliares falham.
+Adicionar quando um fluxo visual passar a ter risco que não esteja suficientemente protegido pelo domínio. Não duplicar dezenas de testes matemáticos no navegador.
 
 ## 7. Como corrigir um bug
 
-Fluxo esperado:
-
 1. reproduzir;
 2. classificar: domínio, dado, integração ou UI;
-3. encontrar a regra oficial aplicável;
-4. criar/ajustar teste que falha pelo motivo correto;
-5. corrigir a menor superfície possível;
-6. rodar test, lint e build;
-7. revisar o diff procurando mudança visual acidental;
-8. documentar se a regra mudou.
+3. localizar fonte oficial/evidência;
+4. escrever teste que falhe pelo motivo correto;
+5. alterar a menor superfície possível;
+6. rodar `test`, `typecheck`, `lint` e `build`;
+7. revisar diff por mudança visual acidental;
+8. atualizar documentação se regra/assunção mudou.
 
-Evite “corrigir no componente” um problema cuja causa está no motor.
+Evite corrigir no componente o que pertence ao domínio.
 
-## 8. Como adicionar um novo exercício
+## 8. Como atualizar Fundeb
 
-Nunca edite 2024/2025/2026 para transformar esses registros no ano novo.
+Os atos do Fundeb podem ser atualizados durante o próprio exercício. Portanto, “ano” não deve ser confundido com uma verdade eterna e única.
 
-Em vez disso:
+Política atual do produto:
 
-1. localizar o ato oficial do novo exercício;
-2. adicionar nova entrada em PARAMETROS_FUNDEB;
-3. registrar a fonte/ato;
-4. adicionar testes dos quatro valores;
-5. adicionar fatores;
-6. validar datas relevantes;
-7. adicionar caso real de regressão quando existir;
-8. manter anos anteriores imutáveis.
+- o repositório mantém um **snapshot selecionado** para cada exercício suportado;
+- para 2026, o snapshot corrente é o da Portaria Interministerial MEC/MF nº 11, de 28/08/2026, publicada em 01/09/2026;
+- a aplicação atual é uma calculadora operacional, não um mecanismo completo de replay “como estava em qualquer data histórica do ano”;
+- se houver requisito de replay temporal, modele snapshots com vigência explícita e testes antes de alterar o comportamento.
 
-Isso preserva simulações históricas e torna alterações auditáveis.
+Procedimento para atualização:
 
-## 9. Performance: onde procurar primeiro
+1. localizar a publicação oficial;
+2. registrar o snapshot e o ato;
+3. conferir valores aluno/ano publicados — não inferir centavos ausentes;
+4. adicionar/ajustar testes;
+5. validar golden cases afetados;
+6. manter evidência de por que o snapshot mudou.
 
-Antes de micro-otimizar React, procure:
+## 9. Performance: ordem de ataque
 
-- chamadas de rede repetidas;
-- parsing repetido de dados grandes;
-- dependências carregadas cedo sem necessidade;
-- operações repetidas dentro do render;
-- falta de cache em dados estáveis;
-- efeitos que refazem chamadas por dependências instáveis;
-- geração de PDF bloqueando a interface.
+Antes de micro-otimizar React:
 
-Uma melhora de performance é válida quando reduz trabalho real e mantém os mesmos resultados.
+1. remover chamadas de rede desnecessárias;
+2. evitar chamadas duplicadas;
+3. cachear lookup estável;
+4. evitar parsing/trabalho repetido;
+5. evitar efeitos disparados por dependências instáveis;
+6. carregar trabalho pesado sob demanda.
+
+A geração de PDF já é carregada dinamicamente; preserve essa característica.
 
 ## 10. Política de frontend
 
 Estado padrão: **congelado**.
 
-Permitido:
+Permitido sem autorização de redesign:
 
-- corrigir elemento quebrado;
-- corrigir texto factualmente errado;
+- consertar comportamento quebrado;
+- corrigir texto factualmente incorreto;
 - corrigir acessibilidade;
 - corrigir layout que impeça uso;
-- reduzir atraso/jank;
-- melhorar feedback de erro/carregamento sem mudar identidade.
+- reduzir jank/espera;
+- melhorar erro/loading sem alterar identidade.
 
-Não permitido sem pedido explícito:
+Não fazer por preferência pessoal:
 
 - trocar paleta;
 - refazer layout;
-- trocar componentes por preferência pessoal;
-- transformar o site em outro padrão visual;
-- alterar fluxo apenas porque parece “mais moderno”.
+- trocar componentes só por estética;
+- reorganizar fluxo “para ficar moderno”.
 
-## 11. Dependências
+## 11. Pull Request ideal
 
-Antes de instalar pacote novo, responda:
+O PR deve informar:
 
-- a dependência resolve um problema real?
-- o projeto já possui ferramenta equivalente?
-- isso aumenta bundle, superfície de falha ou manutenção?
-- a funcionalidade pode ser implementada de forma pequena e testável sem pacote?
+- problema observado;
+- regra/evidência usada;
+- antes/depois;
+- testes adicionados;
+- resultado dos quatro quality gates;
+- impacto de performance;
+- qualquer alteração visual;
+- limitações deliberadamente não automatizadas.
 
-Prefira não adicionar dependências em correções de domínio.
+Não misturar redesign com correção de cálculo.
 
-## 12. PR ideal
+## 12. Checklist antes de “pronto”
 
-Um PR bom para este projeto:
-
-- explica o problema em linguagem simples;
-- identifica a regra/fonte;
-- lista o comportamento antes/depois;
-- mostra os testes adicionados;
-- informa test/lint/build;
-- aponta qualquer mudança visual;
-- não mistura redesign com correção de cálculo;
-- não contém refatoração ampla sem necessidade.
-
-## 13. Checklist para uma IA antes de declarar “pronto”
-
-- [ ] Li AGENTS.md.
-- [ ] Li a documentação de cálculo quando necessário.
-- [ ] Não usei prompt histórico como fonte normativa.
-- [ ] O bug possui teste de regressão quando aplicável.
-- [ ] Golden cases continuam passando.
-- [ ] Não alterei parâmetros históricos sem justificativa oficial.
-- [ ] Não inventei fallback para ano sem suporte.
+- [ ] Li `AGENTS.md`.
+- [ ] Li `docs/fnde-calculation.md` se toquei domínio.
+- [ ] Não usei o prompt Lovable como norma.
+- [ ] Bug determinístico tem regressão.
+- [ ] Golden cases continuam verdes.
+- [ ] Snapshot/ato está documentado.
+- [ ] Ano sem suporte falha fechado.
 - [ ] Não introduzi mudança visual desnecessária.
-- [ ] Rodei testes.
-- [ ] Rodei lint.
-- [ ] Rodei build.
+- [ ] `bun run test` passou.
+- [ ] `bun run typecheck` passou.
+- [ ] `bun run lint` passou.
+- [ ] `bun run build` passou.
 - [ ] Revisei o diff.
-- [ ] Atualizei docs quando a regra mudou.
+- [ ] Upstream não avançou sem reconciliação.
 
-## 14. Handoff mínimo para outra IA
+## 13. Handoff mínimo
 
-Ao encerrar trabalho incompleto, deixe:
+Ao parar no meio do trabalho, registre:
 
-- branch/commit atual;
+- branch/commit;
 - objetivo;
-- o que já foi validado;
-- testes que passam/falham;
+- validações concluídas;
+- checks verdes/vermelhos;
+- arquivos alterados;
 - decisão pendente;
-- arquivos tocados;
 - próximo passo seguro.
 
-Evite handoffs do tipo “continue de onde parei” sem estado verificável.
+Nunca deixe apenas “continue de onde parei”.
