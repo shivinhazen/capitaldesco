@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Building2,
@@ -164,8 +164,25 @@ function Index() {
     }
   }
   useEffect(() => {
-    if (dataCadastro) void atualizarVaaf();
-  }, [modo, dataInicioEstabelecimento, dataCadastro]);
+    if (!dataCadastro) return;
+
+    const ano =
+      modo === "estabelecimentos" && dataInicioEstabelecimento
+        ? (anoBaseDoPrograma("estabelecimentos", dataInicioEstabelecimento, dataCadastro) ??
+          ANO_REFERENCIA)
+        : Number(dataCadastro.slice(0, 4)) || ANO_REFERENCIA;
+
+    setCarregandoVaaf(true);
+    void obterParametros({ data: { ano } })
+      .then((r) => {
+        setVaaf(r.vaaf);
+        setFonteVaaf(r.fonte);
+      })
+      .catch(() => {
+        setFonteVaaf(`Não há parâmetro oficial cadastrado para ${ano}.`);
+      })
+      .finally(() => setCarregandoVaaf(false));
+  }, [modo, dataInicioEstabelecimento, dataCadastro, obterParametros]);
 
   async function buscarEscola() {
     setEscola(null);
@@ -197,8 +214,10 @@ function Index() {
       : Number(dataCadastro.slice(0, 4)) || ANO_REFERENCIA;
   const vaafValido = Number.isFinite(vaaf) && vaaf > 0;
   const dataCadastroValida = /^\d{4}-\d{2}-\d{2}$/.test(dataCadastro);
-  const dataPosteriorAoCadastro = (inicio: string) =>
-    Boolean(inicio && dataCadastroValida && inicio > dataCadastro);
+  const dataPosteriorAoCadastro = useCallback(
+    (inicio: string) => Boolean(inicio && dataCadastroValida && inicio > dataCadastro),
+    [dataCadastro, dataCadastroValida],
+  );
   const errosGerais = [
     !uf ? "Selecione o estado." : "",
     !municipioId ? "Selecione o município." : "",
@@ -224,16 +243,18 @@ function Index() {
       erros.push(`Turma ${i + 1}: alunos especiais não podem superar o total de alunos regulares.`);
     return erros;
   });
-  const paresEstabelecimento = COMBINACOES.filter((c) => c.modalidade === "Regular").map(
-    (regular) => ({
-      regular,
-      especial: COMBINACOES.find(
-        (c) =>
-          c.modalidade === "Educação Especial" &&
-          c.etapa === regular.etapa &&
-          c.turno === regular.turno,
-      ),
-    }),
+  const paresEstabelecimento = useMemo(
+    () =>
+      COMBINACOES.filter((c) => c.modalidade === "Regular").map((regular) => ({
+        regular,
+        especial: COMBINACOES.find(
+          (c) =>
+            c.modalidade === "Educação Especial" &&
+            c.etapa === regular.etapa &&
+            c.turno === regular.turno,
+        ),
+      })),
+    [],
   );
   const errosQuantidadesEstabelecimento = paresEstabelecimento.flatMap(({ regular, especial }) => {
     const total = quantidades[regular.chave] ?? 0;
@@ -302,7 +323,7 @@ function Index() {
         }
         return categorias;
       }),
-    [turmas, vaaf, dataCadastro, dataCadastroValida],
+    [turmas, vaaf, dataCadastro, dataCadastroValida, dataPosteriorAoCadastro, anoBaseAtual],
   );
   const mesesEstabelecimento =
     dataInicioEstabelecimento &&
@@ -357,7 +378,14 @@ function Index() {
         }
         return linhas;
       }),
-    [quantidades, vaaf, mesesEstabelecimento, dataInicioEstabelecimento],
+    [
+      quantidades,
+      vaaf,
+      mesesEstabelecimento,
+      dataInicioEstabelecimento,
+      paresEstabelecimento,
+      anoBaseAtual,
+    ],
   );
   const resultados = dadosValidos
     ? modo === "turmas"
